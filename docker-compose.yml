@@ -1,0 +1,441 @@
+version: "3.8"
+services:
+
+# ==================================================== BEST_PRACTICESO ====================================================
+# To be commented
+#
+# image
+# container_name
+# build
+# networks
+# volumes
+# ports
+# environment
+# depends_on
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart
+
+
+
+# ==================================================== FRONTEND_ANG ====================================================
+# To be commented
+#
+  frontend-ang:
+# image
+# container_name
+    container_name: frontend_ang_container
+# build
+    build:
+      context: .
+      dockerfile: ./docker/frontend_ang.Dockerfile
+# networks
+    networks:
+      - frontend
+# volumes
+# ports
+    ports:
+      - 8082:8082
+# environment
+# depends_on
+    depends_on:
+      - backend_js
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart
+    restart: unless-stopped
+# ---------------------------------------------------- FRONTEND_ANG ----------------------------------------------------    
+
+
+# ==================================================== BACKEND_JS ====================================================
+# To be commented
+#
+  backend-js:
+# image
+# container_name
+    container_name: backend_js_container
+# build
+    build:
+      context: .
+      dockerfile: ./docker/backend_js.Dockerfile 
+# networks
+    networks:
+      - backend
+      - frontend
+# volumes
+# ports
+    ports:
+      - 5000:5000
+# environment
+    environment:
+      - NODE_ENV=production
+      - APP_VERSION=1.0
+# depends_on
+    depends_on:
+      - mariadb
+      - mongo
+      - postgres
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart
+    restart: unless-stopped
+# ---------------------------------------------------- BACKEND_JS ----------------------------------------------------
+
+
+# ==================================================== DB_MARIADB ====================================================
+# To be commented
+#
+#
+  mariadb:
+# image
+    image: mariadb
+# container_name
+    container_name: mariadb_container
+# build
+# networks
+    networks:
+      - backend
+# volumes
+    volumes:
+      - type: bind
+        source: ${MARIADB_DATA_VOL}
+        target: /var/lib/mysql
+# ports
+# environment
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE}
+      MARIADB_USER: ${MARIADB_USER}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
+# depends_on
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy  
+# restart 
+    restart: unless-stopped
+#----------------------------------------------------
+  adminer:
+# image
+    image: adminer
+# container_name
+    container_name: adminer_container   
+# build
+# networks
+    networks:
+      - backend
+# volumes
+# ports
+    ports:
+      - ${ADMINER_PORT}:8080
+# environment
+# depends_on
+    depends_on:
+      - mariadb
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart
+    restart: unless-stopped      
+# ---------------------------------------------------- DB_MARIADB ----------------------------------------------------
+
+
+# ==================================================== DB_MONGO ====================================================
+# To be commented
+#
+#
+  mongo:
+# image
+    image: mongo
+# container_name
+    container_name: mongo_container
+# build
+# networks
+    networks:
+      - backend
+# volumes
+    volumes:
+      - type: bind
+        source: ${MONGO_DATA_VOL}
+        target: /data/db
+# ports
+# environment
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+# depends_on
+# command
+# entrypoint
+# healthcheck
+    healthcheck:
+      test: echo 'db.stats().ok' | mongo localhost:27017/test --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+# configs
+# secrets
+# deploy
+# restart
+    restart: unless-stopped
+
+# ----------------------------------------------------
+  mongo-express:
+# image
+    image: mongo-express
+# container_name
+    container_name: mongo-express_container
+# build
+# networks
+    networks:
+      - backend
+# volumes
+# ports
+    ports:
+      - ${ME_PORT}:8081
+# environment
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${ME_CONFIG_MONGODB_ADMINUSERNAME}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${ME_CONFIG_MONGODB_ADMINPASSWORD}
+      ME_CONFIG_MONGODB_URL: mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/
+# depends_on
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart  
+    restart: unless-stopped
+# ---------------------------------------------------- DB_MONGO ----------------------------------------------------
+
+
+# ==================================================== DB_POSTGRES ====================================================
+# To be commented
+#
+#
+  postgres:
+# image
+    image: postgres:15-alpine
+# container_name
+    container_name: postgres_container
+# build
+# networks
+    networks:
+      - backend
+# volumes
+    volumes:
+        # Postgres custon .conf file
+        #      - type: bind
+        #        source: ${POSTGRES_CONF}
+        #        target: /var/lib/postgresql/data/postgresql.conf
+      - type: bind
+        source: ${POSTGRES_DBINIT_VOL}
+        target: /docker-entrypoint-initdb.d
+      - type: bind
+        source: ${POSTGRES_DATA_VOL}
+        target: /var/lib/postgresql/data
+# ports
+    ports:
+      - "5432:5432"
+# environment
+# depends_on
+# command
+# Postgres startup command or use .conf file
+    command:
+      - "postgres"
+      - "-c"
+      - "max_connections=50"
+      - "-c"
+      - "lock_timeout=1s"
+# entrypoint
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+# healthcheck
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+# configs
+# secrets
+# deploy
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+# restart
+    restart: unless-stopped
+
+# ----------------------------------------------------
+  pgadmin:
+# image
+    image: dpage/pgadmin4:7.1
+# container_name
+    container_name: pgadmin_container
+# build
+# networks
+    networks:
+      - backend
+# volumes
+    volumes:
+      - type: bind
+        source: ${PGADMIN_DATA_VOL}
+        target: /var/lib/pgadmin
+# ports
+    ports:
+      - "${PGADMIN_PORT}:80"
+# environment
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+# depends_on
+    depends_on:
+      - postgres
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+# restart 
+    restart: unless-stopped
+# ---------------------------------------------------- DB_POSTGRES ----------------------------------------------------      
+
+# ++++++++++++++++++++++++++++++++++++++++++++++++++++ MONITORING ++++++++++++++++++++++++++++++++++++++++++++++++++++
+  grafana:
+# image
+# container_name
+    container_name: grafana_container
+# build
+    build:
+#      context: ./grafana
+      dockerfile: ./docker/grafana.Dockerfile 
+# networks
+    networks:
+      - backend
+# volumes
+# ports
+    ports:
+      - 3000:3000
+# environment
+# depends_on
+    depends_on:
+      - prometheus
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart
+    restart: unless-stopped
+# ----------------------------------------------------
+  prometheus:
+# image
+# container_name
+    container_name: prometheus_container
+# build
+    build:
+#      context: .
+      dockerfile: ./docker/prometheus.Dockerfile
+# networks
+    networks:
+      - backend
+# volumes
+ #   volumes:
+ #     - type: bind
+ #       source: ${PROMETHEUS_CONF}
+ #       target: /etc/prometheus/prometheus.yml:ro
+# ports
+    ports:
+      - 9090:9090
+# environment
+# depends_on
+    depends_on:
+      - postgres_exporter
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+# restart  
+    restart: unless-stopped
+# ----------------------------------------------------
+  postgres_exporter:
+# image
+    image: prometheuscommunity/postgres-exporter:v0.12.0
+# container_name
+    container_name: pgexporter_container
+# build
+# networks
+    networks:
+      - backend
+# volumes
+    volumes:
+      - type: bind
+        source: ${PG_EXPORTER_YAML}
+        target: /etc/postgres_exporter/queries.yaml:ro
+# ports
+    ports:
+      - "9187:9187"
+# environment
+    environment:
+      DATA_SOURCE_URI: "postgres:5432/${POSTGRES_DB}?sslmode=disable"
+      DATA_SOURCE_USER: ${POSTGRES_USER}
+      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      PG_EXPORTER_EXTEND_QUERY_PATH: "/etc/postgres_exporter/queries.yaml"
+# depends_on
+    depends_on:
+      - postgres
+# command
+# entrypoint
+# healthcheck
+# configs
+# secrets
+# deploy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 500M
+# restart  
+    restart: unless-stopped
+# ---------------------------------------------------- MONITORING ----------------------------------------------------
+
+networks:
+  frontend:
+    driver: bridge         
+  backend:
+    driver: bridge
